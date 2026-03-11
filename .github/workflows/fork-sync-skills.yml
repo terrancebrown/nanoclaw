@@ -146,6 +146,7 @@ jobs:
 
       - name: Open issue for upstream sync failure
         if: steps.sync.outputs.sync_failed == 'true'
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -172,6 +173,7 @@ jobs:
 
       - name: Open issue for failed skill merges
         if: steps.merge.outputs.failed != ''
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
