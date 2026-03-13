@@ -41,7 +41,13 @@ jobs:
         run: |
           # Add upstream remote
           git remote add upstream https://github.com/qwibitai/nanoclaw.git
-          git fetch upstream main
+
+          # Fetch upstream — skip sync if unreachable
+          if ! git fetch upstream main; then
+            echo "::warning::Failed to fetch upstream main — skipping sync"
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           # Check if upstream has new commits
           if git merge-base --is-ancestor upstream/main HEAD; then
@@ -60,7 +66,14 @@ jobs:
           fi
 
           # Validate build
-          npm ci
+          if ! npm ci; then
+            echo "::error::npm ci failed after merging upstream/main"
+            git reset --hard "origin/main"
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+            echo "sync_failed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if ! npm run build; then
             echo "::error::Build failed after merging upstream/main"
             git reset --hard "origin/main"
@@ -77,7 +90,12 @@ jobs:
             exit 0
           fi
 
-          git push origin main
+          if ! git push origin main; then
+            echo "::error::Failed to push synced main to origin"
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+            echo "sync_failed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "synced=true" >> "$GITHUB_OUTPUT"
 
       - name: Merge main into skill branches
@@ -115,7 +133,12 @@ jobs:
               continue
             fi
 
-            npm ci
+            if ! npm ci; then
+              echo "::warning::npm ci failed for $BRANCH"
+              git reset --hard "origin/$BRANCH"
+              FAILED="$FAILED $SKILL_NAME"
+              continue
+            fi
 
             if ! npm run build; then
               echo "::warning::Build failed for $BRANCH"
@@ -131,7 +154,11 @@ jobs:
               continue
             fi
 
-            git push origin "$BRANCH"
+            if ! git push origin "$BRANCH"; then
+              echo "::warning::Failed to push $BRANCH"
+              FAILED="$FAILED $SKILL_NAME"
+              continue
+            fi
             SUCCEEDED="$SUCCEEDED $SKILL_NAME"
             echo "$BRANCH merged and pushed successfully."
           done
