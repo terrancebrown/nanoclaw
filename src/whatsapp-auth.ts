@@ -45,26 +45,18 @@ function askQuestion(prompt: string): Promise<string> {
   });
 }
 
-async function connectSocket(
-  phoneNumber?: string,
-  isReconnect = false,
-): Promise<void> {
+async function connectSocket(phoneNumber?: string, isReconnect = false): Promise<void> {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
   if (state.creds.registered && !isReconnect) {
     fs.writeFileSync(STATUS_FILE, 'already_authenticated');
     console.log('✓ Already authenticated with WhatsApp');
-    console.log(
-      '  To re-authenticate, delete the store/auth folder and run again.',
-    );
+    console.log('  To re-authenticate, delete the store/auth folder and run again.');
     process.exit(0);
   }
 
   const { version } = await fetchLatestWaWebVersion({}).catch((err) => {
-    logger.warn(
-      { err },
-      'Failed to fetch latest WA Web version, using default',
-    );
+    logger.warn({ err }, 'Failed to fetch latest WA Web version, using default');
     return { version: undefined };
   });
   const sock = makeWASocket({
@@ -164,9 +156,7 @@ async function authenticate(): Promise<void> {
 
   let phoneNumber = phoneArg;
   if (usePairingCode && !phoneNumber) {
-    phoneNumber = await askQuestion(
-      'Enter your phone number (with country code, no + or spaces, e.g. 14155551234): ',
-    );
+    phoneNumber = await askQuestion('Enter your phone number (with country code, no + or spaces, e.g. 14155551234): ');
   }
 
   console.log('Starting WhatsApp authentication...\n');
