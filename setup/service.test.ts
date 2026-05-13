@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
 
+import { getLaunchdLabel } from '../src/install-slug.js';
+
 /**
  * Tests for service configuration generation.
  *
@@ -14,12 +16,13 @@ function generatePlist(
   projectRoot: string,
   homeDir: string,
 ): string {
+  const label = getLaunchdLabel(projectRoot);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.nanoclaw</string>
+    <string>${label}</string>
     <key>ProgramArguments</key>
     <array>
         <string>${nodePath}</string>
@@ -62,6 +65,7 @@ ExecStart=${nodePath} ${projectRoot}/dist/index.js
 WorkingDirectory=${projectRoot}
 Restart=always
 RestartSec=5
+KillMode=process
 Environment=HOME=${homeDir}
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:${homeDir}/.local/bin
 StandardOutput=append:${projectRoot}/logs/nanoclaw.log
@@ -72,13 +76,11 @@ WantedBy=${isSystem ? 'multi-user.target' : 'default.target'}`;
 }
 
 describe('plist generation', () => {
-  it('contains the correct label', () => {
-    const plist = generatePlist(
-      '/usr/local/bin/node',
-      '/home/user/nanoclaw',
-      '/home/user',
-    );
-    expect(plist).toContain('<string>com.nanoclaw</string>');
+  it('contains the slug-scoped label', () => {
+    const projectRoot = '/home/user/nanoclaw';
+    const plist = generatePlist('/usr/local/bin/node', projectRoot, '/home/user');
+    expect(plist).toContain(`<string>${getLaunchdLabel(projectRoot)}</string>`);
+    expect(plist).toMatch(/<string>com\.nanoclaw-v2-[0-9a-f]{8}<\/string>/);
   });
 
   it('uses the correct node path', () => {
@@ -140,6 +142,16 @@ describe('systemd unit generation', () => {
     );
     expect(unit).toContain('Restart=always');
     expect(unit).toContain('RestartSec=5');
+  });
+
+  it('uses KillMode=process to preserve detached children', () => {
+    const unit = generateSystemdUnit(
+      '/usr/bin/node',
+      '/home/user/nanoclaw',
+      '/home/user',
+      false,
+    );
+    expect(unit).toContain('KillMode=process');
   });
 
   it('sets correct ExecStart', () => {
